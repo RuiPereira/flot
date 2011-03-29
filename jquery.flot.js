@@ -2371,7 +2371,8 @@
             for (var i = 0; i < series.length; ++i) {
                 s = series[i];
                 label = s.label;
-                if (!label)
+                // allow hidden legend
+                if (!label || (s.legend && !s.legend.show))
                     continue;
                 
                 if (i % options.legend.noColumns == 0) {
