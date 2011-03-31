@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" dit="ltr">
+ <head>
+    <meta charset="utf-8">
+    <title>Flot Examples - export2png</title>
+    <link href="layout.css" rel="stylesheet" type="text/css">
+    <script language="javascript" type="text/javascript" src="../jquery.js"></script>
+    <script language="javascript" type="text/javascript" src="../jquery.flot.js"></script>
+    <script language="javascript" type="text/javascript" src="../jquery.flot.text.js"></script>
+ </head>
+    <body>
+    <div id="placeholder" style="width:600px;height:300px;"></div>
+    <p>Middle/right-click me!</p>
+
+<script id="source" language="javascript" type="text/javascript">
+$(function () {
+    var d1 = [];
+    for (var i = 0; i < 14; i += 0.5)
+        d1.push([i, Math.sin(i)]);
+
+    var d2 = [[0, 3], [4, 8], [8, 5], [9, 13]];
+    // a null signifies separate line segments
+    var d3 = [[0, 12], [7, 12], null, [7, 2.5], [12, 2.5]];
+
+    var data = [ {data: d1, label:'data1'}, d2, {data:d3, label:'data3'} ], opts = {};
+    var plot = $.plot($("#placeholder"), data, opts);
+    var placeholder = plot.getPlaceholder();
+    placeholder.mousedown(function(event){
+        if (event.which > 1){
+            event.preventDefault();
+            // activate canvasText, replot, save PNG, replot as before
+            var tmpopts = $.extend(true, {}, plot.getOptions(), {grid: {canvasText: {show: true, font: "12px sans-serif"}}});
+            plot = $.plot(placeholder, data, tmpopts);
+            var img = '<img id="export2png" src="'+plot.getCanvas().toDataURL('image/png')+'"/>';
+            $.plot(placeholder, data, opts);
+            var newwin = window.open('','RecipeWindow','width='+($(this).width()+20)+',height='+($(this).height()+20));
+            newwin.document.open();
+            newwin.document.write(img);
+            newwin.document.close();
+        }
+    });
+});
+</script>
+
+ </body>
+</html>
