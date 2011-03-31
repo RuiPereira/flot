@@ -16,10 +16,12 @@
 $(function () {
     var d1 = [];
     for (var i = 0; i < 14; i += 0.5) d1.push([i, Math.sin(i)]);
-    var d2 = [[0, 3], [4, 8], [8, 5], [9, 13]];
-    var d3 = [[0, 12], [7, 12], null, [7, 2.5], [12, 2.5]];
-    
-    var opts = {xaxis: {label: 'X'}, yaxis: {label: 'Y'}};
+    var d2 = {data: [[0, 3], [4, 8], [8, 5], [9, 13]], yaxis: 2};
+    var d3 = {data: [[0, 12], [7, 12], null, [7, 2.5], [12, 2.5]], xaxis: 2};
+
+    var opts = {xaxes: [{label: 'X'}, {alignTicksWithAxis: 1, label: 'X2'}],
+                yaxes: [{label: 'Y', tickFormatter: function(val, axis){ return val.toFixed(2);}},
+                        {label: 'Y2', labelPos: 'low'}]};
     $.plot($("#placeholder"), [ d1, d2, d3 ], opts);
 });
 </script>
