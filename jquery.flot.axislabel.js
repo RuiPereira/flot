@@ -21,9 +21,9 @@ rui (dot) pereira (at) gmail (dot) com
 
         // generator
         var tmpopts = axis.n == 1? opts: (typeof opts.alignedTo != 'undefined')? opts.alignedTo.options: null;
-        if (tmpopts && tmpopts.autoscaleMargin == null &&
-                ((tmpopts.labelPos == 'high' && tmpopts.max == null) ||
-                        (tmpopts.labelPos == 'low' && tmpopts.min == null)))
+        if (tmpopts && (tmpopts.autoscaleMargin == null ||
+                (tmpopts.labelPos == 'high' && tmpopts.max != null) ||
+                (tmpopts.labelPos == 'low' && tmpopts.min != null)))
             // cut ticks not seen
             ticks = $.grep(axis.tickGenerator(axis), function(v){
                 return (v > axis.min && v < axis.max);
@@ -37,9 +37,11 @@ rui (dot) pereira (at) gmail (dot) com
             return opts.label;
         else {
             // user set tickFormatter
-            if ($.isFunction(opts.userFormatter))
-                return opts.userFormatter(val, axis);
-            else {
+            if ($.isFunction(opts.userFormatter)){
+                var tmp = opts.userFormatter;
+                opts.userFormatter = null;
+                return tmp(val, axis);
+            } else {
                 // scientific notation for small values
                 if ((axis.datamax != 0 && Math.abs(axis.datamax) < 1e-5) ||
                         (axis.datamin != 0 && Math.abs(axis.datamin) < 1e-5))
