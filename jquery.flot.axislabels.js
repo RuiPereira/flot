@@ -6,10 +6,11 @@ Flot plugin for labeling axis
         labelPos: "high" or "low"
     }
 
-This plugin allows you to label an axis, by replacing one of the extreme ticks
-with the chosen label string. Set labelPos to "high" or "low" to replace
-respectively the maximum or the minimum value of the ticks. User set axis.tickFormatter
-are respected.
+This plugin allows you to label an axis without much fuss, by
+replacing one of the extreme ticks with the chosen label string. Set
+labelPos to "high" or "low" to replace respectively the maximum or the
+minimum value of the ticks. User set axis.tickFormatter are respected
+and multiple axes supported.
 
 Rui Pereira
 rui (dot) pereira (at) gmail (dot) com
@@ -21,6 +22,7 @@ rui (dot) pereira (at) gmail (dot) com
 
         // generator
         var tmpopts = axis.n == 1? opts: (typeof opts.alignedTo != 'undefined')? opts.alignedTo.options: null;
+        // first axis or some axis aligned wrt it
         if (tmpopts && (tmpopts.autoscaleMargin == null ||
                 (tmpopts.labelPos == 'high' && tmpopts.max != null) ||
                 (tmpopts.labelPos == 'low' && tmpopts.min != null)))
@@ -39,6 +41,7 @@ rui (dot) pereira (at) gmail (dot) com
             // user set tickFormatter
             if ($.isFunction(opts.userFormatter)){
                 var tmp = opts.userFormatter;
+                // avoid infinite loops
                 opts.userFormatter = null;
                 return tmp(val, axis);
             } else {
@@ -78,7 +81,7 @@ rui (dot) pereira (at) gmail (dot) com
     $.plot.plugins.push({
                 init: init,
                 options: options,
-                name: "axislabel",
+                name: "axislabels",
                 version: "0.1"
             });
 })(jQuery);
