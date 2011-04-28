@@ -67,12 +67,45 @@
         /**
         * This is the modified version of FLOT's insertLabels function.
         */  
+        var hasCSS3transform = false;
         plot.insertLabelsCanvasText = function (ctx) {
             var options = plot.getOptions();
             var axes = plot.getAxes();
             var plotOffset = plot.getPlotOffset();
             var plotHeight = plot.height();
-            
+
+            //figure out whether the browser supports CSS3 2d transforms
+            //for label angle, logic borrowed from Modernizr
+            var transform = undefined,addRotateLabelStyles = function () {},
+            props = [ 'transformProperty', 'WebkitTransform', 'MozTransform', 'OTransform', 'msTransform' ],
+            prefix = [ '', '-webkit-', '-moz-', '-o-', '-ms-' ],
+            testEl = document.createElement('flotelement');
+
+            for ( var i in props) {
+                if ( testEl.style[ props[i] ] !== undefined ) {
+                    transform = prefix[i];
+                    break;
+                }
+            }
+
+            if (transform != undefined) { //use CSS3 2d transforms
+                hasCSS3transform = true;
+                addRotateLabelStyles = function(styles,axis){
+                    //flip the angle so CSS3 and Filter work the same way
+                    styles.push(transform+"transform:rotate("+-axis.options.labelAngle+"deg)");
+                    styles.push(transform+"transform-origin:top left");
+                }
+            } else if (typeof testEl.style.filter == 'string' ||
+                       typeof testEl.style.filters == 'object') { //IE without 2d transforms
+                addRotateLabelStyles = function(styles,axis) {
+                    var rad = axis.options.labelAngle * Math.PI / 180,
+                    cos = Math.cos(rad),
+                    sin = Math.sin(rad);
+
+                    styles.push("filter:progid:DXImageTransform.Microsoft.Matrix(M11="+cos+", M12="+sin+", M21="+(-sin)+", M22="+cos+",sizingMethod='auto expand'");
+                }
+            }
+
             ctx.strokeStyle = options.grid.color;
 
             function addLabels(axis, labelGenerator) {
@@ -90,35 +123,46 @@
             addLabels(axes.xaxis, function (tick, axis) {
                 var label = tick.label;
                 var labels;
-
+                var x, y;
                 /**
                 * If user requests, tick labels are displayed one word per line
                 */
                 labels = (options.grid.canvasText.lineBreaks.show)?label.split(" "):[label];
-
-                var y = (plotOffset.top + plotHeight + margin);
+                y = (plotOffset.top + plotHeight + margin);
                 if (labels.length > 1) {
                     y -= options.grid.canvasText.lineBreaks.marginBottom; // move up the labels a bit
                 }
                 for(var j=0; j < labels.length; j++){
-                    /**
-                    * implements an equivalent to the text-align:center CSS option
-                    */
-                    var x = Math.round(plotOffset.left + axis.p2c(tick.v) - ctx.measureText(labels[j]).width/2);
-                    /**
-                    * where:
-                    *   plotOffset.left = area where the Y axis is plotted (left of the actual graph)
-                    *   axis.p2c(tick.v) = # of pixels associated with the tick value
-                    *   labelWidth/2 = half of the length of the label so it's centered
-                    */
-                    y += ctx.fontAscent();
-                    /**
-                    * where:
-                    *   ctx.fontAscent() = height of the character
-                    */
-                    ctx.fillText(labels[j],x,y);
-                    y += options.grid.canvasText.lineBreaks.lineSpacing; // for line-spacing
+                    if (axis.options.labelAngle != 0){
+                        var angledPos = calculateAxisAngledLabels(axis);
+                        x = Math.round(plotOffset.left + axis.p2c(tick.v)) + angledPos.oLeft + ctx.fontAscent();
+                        y = angledPos.top;
+                        ctx.translate(x, y);
+                        ctx.rotate(-axis.options.labelAngle*Math.PI/180.);
+                        ctx.fillText(label, 0, 0);
+                        ctx.rotate(axis.options.labelAngle*Math.PI/180.);
+                        ctx.translate(-x, -y);
+                    } else {
+                        /**
+                        * implements an equivalent to the text-align:center CSS option
+                        */
+                        x = Math.round(plotOffset.left + axis.p2c(tick.v) - ctx.measureText(labels[j]).width/2);
+                        /**
+                        * where:
+                        *   plotOffset.left = area where the Y axis is plotted (left of the actual graph)
+                        *   axis.p2c(tick.v) = # of pixels associated with the tick value
+                        *   labelWidth/2 = half of the length of the label so it's centered
+                        */
+                        y += ctx.fontAscent();
+                        /**
+                        * where:
+                        *   ctx.fontAscent() = height of the character
+                        */
+                        ctx.fillText(labels[j],x,y);
+                        y += options.grid.canvasText.lineBreaks.lineSpacing; // for line-spacing
+                    }
                 }
+
             });
             
             addLabels(axes.yaxis, function (tick, axis) {
@@ -126,21 +170,140 @@
                 var labelWidth = ctx.measureText(label).width;
                 var labelHeight = ctx.fontAscent();
                 var plotOffsetLeftArea = plotOffset.left - margin;
+                var x, y;
+                // based on ryleyb labelAngle modifications to flot
+                if (axis.options.labelAngle != 0){
+                    var angledPos = calculateAxisAngledLabels(axis);
+                    x = angledPos.left + ctx.fontAscent();
+                    y = Math.round(plotOffset.top + axis.p2c(tick.v)) + angledPos.oTop;
+                    ctx.translate(x, y);
+                    ctx.rotate(-axis.options.labelAngle*Math.PI/180.);
+                    ctx.fillText(label, 0, 0);
+                    ctx.rotate(axis.options.labelAngle*Math.PI/180.);
+                    ctx.translate(-x, -y);
 
-                var x = 0;
-
-                /**
-                * implements an equivalent to the text-align:right CSS option
-                */                              
-                x +=(Math.round(labelWidth) < plotOffsetLeftArea)?plotOffsetLeftArea-Math.round(labelWidth):0;
-                x -=(Math.round(labelWidth) > plotOffsetLeftArea)?Math.round(labelWidth)-plotOffsetLeftArea:0;
-
-                var y = Math.round(plotOffset.top + axis.p2c(tick.v) - labelHeight / 2);
-                y += ctx.fontAscent(); 
-
-                ctx.fillText(label, x, y);
-            }); 
+                } else {
+                    /**
+                    * implements an equivalent to the text-align:right CSS option
+                    */
+                    x =(Math.round(labelWidth) < plotOffsetLeftArea)?plotOffsetLeftArea-Math.round(labelWidth):0;
+                    x -=(Math.round(labelWidth) > plotOffsetLeftArea)?Math.round(labelWidth)-plotOffsetLeftArea:0;
+                    y = Math.round(plotOffset.top + axis.p2c(tick.v) - labelHeight / 2) + ctx.fontAscent();
+                    ctx.fillText(label, x, y);
+                }
+            });
         };
+
+        // copied from ryleyb labelAngle modifications to flot
+        function calculateRotatedDimensions(width,height,angle){
+            if (!angle)
+                return {};
+            var rad = angle * Math.PI / 180,
+                sin   = Math.sin(rad),
+                cos   = Math.cos(rad);
+
+            var x1 = cos * width,
+                y1 = sin * width;
+            var x2 = -sin * height,
+                y2 = cos * height;
+            var x3 = cos * width - sin * height,
+                y3 = sin * width + cos * height;
+            var minX = Math.min(0, x1, x2, x3),
+                maxX = Math.max(0, x1, x2, x3),
+                minY = Math.min(0, y1, y2, y3),
+                maxY = Math.max(0, y1, y2, y3);
+
+            //next figure out the x,y locations of certain points on the rotated
+            //rectangle
+            //specifically, if our rectangle is defined by (0 ,0),(w,0),(w ,-h ),(-h,0)
+            //for negative angles:
+            //  -we need to know where (-h',0'), as it is the left-most point
+            //  -we need to know where (-h/2',0') is , for center alignment
+            //  -and the same for the right side - (w',0') and (w',-h/2')
+            var aligned_left = { x: height/2 * sin, y: height/2 * cos};
+            var aligned_right = {x: (width*cos + height/2*sin), y: (width*sin - height/2*cos)};//(w',-h/2')
+            var topmost,bottommost,leftmost;
+            if (angle < 0){
+                bottommost = { x: (width*cos + height*sin), y:(width*sin - height*cos)};//(w',-h')
+                leftmost = { x: height * sin, y: height * cos};
+            } else {
+                topmost = { x: x1, y: y1};//(w',0)
+                bottommost = { x: height * sin, y: -height*cos};//(0',-h')
+            }
+
+            return { width: (maxX-minX), height: (maxY - minY),
+                     a_left:aligned_left, a_right:aligned_right,
+                     topmost:topmost,bottommost:bottommost,
+                     leftmost:leftmost};
+        }
+        function calculateAxisAngledLabels(axis){
+            var angle = axis.options.labelAngle;
+            if (angle == undefined || angle == 0)
+                return {};
+            var box = axis.box;
+            var dims = calculateRotatedDimensions(axis.options.origWidth,axis.options.origHeight,angle);
+            var align = "left";
+            var oLeft=0, oTop=0, top, left;
+
+            if (axis.position == 'bottom'){
+                top = box.top + box.padding;
+                if (angle < 0) {
+                    if (hasCSS3transform)
+                        oLeft = -dims.a_left.x;
+                    else
+                        oLeft = dims.a_left.x;
+                } else {
+                    align = "right";
+                    oLeft = -dims.a_right.x;
+                    if (hasCSS3transform)
+                        top += dims.topmost.y;
+                }
+            } else if (axis.position == 'top') {
+                top = box.top;
+                if (hasCSS3transform && angle > 0)
+                    top += box.height - box.padding + dims.bottommost.y;
+
+                if (angle < 0)
+                    align = "right";
+                if (!hasCSS3transform && angle < 0){
+                    oLeft = -dims.width - dims.a_left.x;
+                } else {
+                    if (angle < 0)
+                        oLeft = -dims.a_right.x;
+                    else
+                        oLeft = -dims.a_left.x;
+                }
+            } else if (axis.position == 'left') {
+                align = "right";
+                left = box.left;
+                if (angle < 0) {
+                    oTop = dims.a_right.y;
+                    if (hasCSS3transform)
+                        left -= dims.leftmost.x;
+                } else {
+                    //left += (axis.options.origWidth-dims.width);
+                    if (!hasCSS3transform)
+                        oTop = -dims.a_left.y;
+                    else
+                        oTop = dims.a_right.y;
+                }
+            } else if (axis.position == 'right') {
+                align = "left";
+                left = box.left + box.padding;
+                if (angle < 0) {
+                    if (hasCSS3transform)
+                        left -= dims.leftmost.x;
+                    oTop = -dims.a_left.y;
+                } else {
+                    if (!hasCSS3transform)
+                        oTop = -dims.height + dims.a_left.y;
+                    else
+                        oTop = -dims.a_left.y;
+                }
+            }
+
+            return {top: top, left: left, oTop: oTop, oLeft: oLeft, align: align };
+        }
 
         /**
         * This is the modified version of FLOT's insertLegend function.
@@ -162,7 +325,7 @@
             legendWidth = 0;
             legendHeight = 0;
 
-            var series_with_legend = $.grep(series, function(s, i) {
+            var series_with_legend = $.grep(series, function(s) {
                 return !(!s.label || (s.legend && !s.legend.show));
             });
             /**
