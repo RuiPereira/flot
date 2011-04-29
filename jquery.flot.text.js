@@ -122,6 +122,8 @@
 
             addLabels(axes.xaxis, function (tick, axis) {
                 var label = tick.label;
+                var labelWidth = ctx.measureText(label).width;
+                var labelAngle = axis.options.labelAngle;
                 var labels;
                 var x, y;
                 /**
@@ -133,10 +135,9 @@
                     y -= options.grid.canvasText.lineBreaks.marginBottom; // move up the labels a bit
                 }
                 for(var j=0; j < labels.length; j++){
-                    if (axis.options.labelAngle != 0){
-                        var angledPos = calculateAxisAngledLabels(axis);
-                        x = Math.round(plotOffset.left + axis.p2c(tick.v)) + angledPos.oLeft + ctx.fontAscent();
-                        y = angledPos.top;
+                    if (labelAngle != 0){
+                        x = Math.round(plotOffset.left + axis.p2c(tick.v) - (Math.cos(labelAngle*Math.PI/180.) * labelWidth));
+                        y = axis.box.top + axis.box.padding + margin + Math.round(Math.sin(labelAngle*Math.PI/180.) * labelWidth);
                         ctx.translate(x, y);
                         ctx.rotate(-axis.options.labelAngle*Math.PI/180.);
                         ctx.fillText(label, 0, 0);
@@ -169,13 +170,13 @@
                 var label = tick.label;
                 var labelWidth = ctx.measureText(label).width;
                 var labelHeight = ctx.fontAscent();
+                var labelAngle = axis.options.labelAngle;
                 var plotOffsetLeftArea = plotOffset.left - margin;
                 var x, y;
                 // based on ryleyb labelAngle modifications to flot
-                if (axis.options.labelAngle != 0){
-                    var angledPos = calculateAxisAngledLabels(axis);
-                    x = angledPos.left + ctx.fontAscent();
-                    y = Math.round(plotOffset.top + axis.p2c(tick.v)) + angledPos.oTop;
+                if (labelAngle != 0){
+                    x = plotOffsetLeftArea - Math.round(Math.cos(labelAngle*Math.PI/180.) * labelWidth);
+                    y = Math.round(plotOffset.top + axis.p2c(tick.v) + (Math.sin(labelAngle*Math.PI/180.) * labelWidth));
                     ctx.translate(x, y);
                     ctx.rotate(-axis.options.labelAngle*Math.PI/180.);
                     ctx.fillText(label, 0, 0);
@@ -193,117 +194,6 @@
                 }
             });
         };
-
-        // copied from ryleyb labelAngle modifications to flot
-        function calculateRotatedDimensions(width,height,angle){
-            if (!angle)
-                return {};
-            var rad = angle * Math.PI / 180,
-                sin   = Math.sin(rad),
-                cos   = Math.cos(rad);
-
-            var x1 = cos * width,
-                y1 = sin * width;
-            var x2 = -sin * height,
-                y2 = cos * height;
-            var x3 = cos * width - sin * height,
-                y3 = sin * width + cos * height;
-            var minX = Math.min(0, x1, x2, x3),
-                maxX = Math.max(0, x1, x2, x3),
-                minY = Math.min(0, y1, y2, y3),
-                maxY = Math.max(0, y1, y2, y3);
-
-            //next figure out the x,y locations of certain points on the rotated
-            //rectangle
-            //specifically, if our rectangle is defined by (0 ,0),(w,0),(w ,-h ),(-h,0)
-            //for negative angles:
-            //  -we need to know where (-h',0'), as it is the left-most point
-            //  -we need to know where (-h/2',0') is , for center alignment
-            //  -and the same for the right side - (w',0') and (w',-h/2')
-            var aligned_left = { x: height/2 * sin, y: height/2 * cos};
-            var aligned_right = {x: (width*cos + height/2*sin), y: (width*sin - height/2*cos)};//(w',-h/2')
-            var topmost,bottommost,leftmost;
-            if (angle < 0){
-                bottommost = { x: (width*cos + height*sin), y:(width*sin - height*cos)};//(w',-h')
-                leftmost = { x: height * sin, y: height * cos};
-            } else {
-                topmost = { x: x1, y: y1};//(w',0)
-                bottommost = { x: height * sin, y: -height*cos};//(0',-h')
-            }
-
-            return { width: (maxX-minX), height: (maxY - minY),
-                     a_left:aligned_left, a_right:aligned_right,
-                     topmost:topmost,bottommost:bottommost,
-                     leftmost:leftmost};
-        }
-        function calculateAxisAngledLabels(axis){
-            var angle = axis.options.labelAngle;
-            if (angle == undefined || angle == 0)
-                return {};
-            var box = axis.box;
-            var dims = calculateRotatedDimensions(axis.options.origWidth,axis.options.origHeight,angle);
-            var align = "left";
-            var oLeft=0, oTop=0, top, left;
-
-            if (axis.position == 'bottom'){
-                top = box.top + box.padding;
-                if (angle < 0) {
-                    if (hasCSS3transform)
-                        oLeft = -dims.a_left.x;
-                    else
-                        oLeft = dims.a_left.x;
-                } else {
-                    align = "right";
-                    oLeft = -dims.a_right.x;
-                    if (hasCSS3transform)
-                        top += dims.topmost.y;
-                }
-            } else if (axis.position == 'top') {
-                top = box.top;
-                if (hasCSS3transform && angle > 0)
-                    top += box.height - box.padding + dims.bottommost.y;
-
-                if (angle < 0)
-                    align = "right";
-                if (!hasCSS3transform && angle < 0){
-                    oLeft = -dims.width - dims.a_left.x;
-                } else {
-                    if (angle < 0)
-                        oLeft = -dims.a_right.x;
-                    else
-                        oLeft = -dims.a_left.x;
-                }
-            } else if (axis.position == 'left') {
-                align = "right";
-                left = box.left;
-                if (angle < 0) {
-                    oTop = dims.a_right.y;
-                    if (hasCSS3transform)
-                        left -= dims.leftmost.x;
-                } else {
-                    //left += (axis.options.origWidth-dims.width);
-                    if (!hasCSS3transform)
-                        oTop = -dims.a_left.y;
-                    else
-                        oTop = dims.a_right.y;
-                }
-            } else if (axis.position == 'right') {
-                align = "left";
-                left = box.left + box.padding;
-                if (angle < 0) {
-                    if (hasCSS3transform)
-                        left -= dims.leftmost.x;
-                    oTop = -dims.a_left.y;
-                } else {
-                    if (!hasCSS3transform)
-                        oTop = -dims.height + dims.a_left.y;
-                    else
-                        oTop = -dims.a_left.y;
-                }
-            }
-
-            return {top: top, left: left, oTop: oTop, oLeft: oLeft, align: align };
-        }
 
         /**
         * This is the modified version of FLOT's insertLegend function.
