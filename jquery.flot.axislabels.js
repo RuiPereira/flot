@@ -28,7 +28,7 @@ rui (dot) pereira (at) gmail (dot) com
                 (tmpopts.labelPos == 'low' && tmpopts.min != null)))
             // cut ticks not seen
             ticks = $.grep(axis.tickGenerator(axis), function(v){
-                return (v > axis.min && v < axis.max);
+                return (v >= axis.min && v <= axis.max);
             });
         // standard tick generator
         else ticks = axis.tickGenerator(axis);
